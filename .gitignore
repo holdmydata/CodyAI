@@ -1,5 +1,3 @@
-GPT/inputs/
-GPT/validation/
 GPT/.ipynb_checkpoints/
 GPT/checkpoints
 train-checkpoint.ipynb
