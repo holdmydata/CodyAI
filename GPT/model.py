@@ -14,14 +14,17 @@ import torch
 import torch.nn as nn
 from datetime import datetime
 from torch.nn import functional as F
+import pandas as pd
+import csv
+from csv import DictWriter
 
 print(f'Cuda is available? : {torch.cuda.is_available()}!')
 
 #hyperparameters
 batch_size = 64
-block_size = 8
-max_iters = 1000
-eval_interval = 100
+block_size = 256
+max_iters = 5000
+eval_interval = 500
 learning_rate = 1e-3
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 eval_iters = 200
@@ -229,7 +232,15 @@ for iter in range(max_iters):
     # occasionally evaluate the loss on train and val sets
     if iter % eval_interval == 0:
         losses = estimate_loss()
+        now = datetime.now()
         print(f'time: {now.strftime("%m/%d/%y %H:%M:%S")};iter {iter}; train loss: {losses["train"]:.3f}; val loss: {losses["val"]:.3f}')
+        # save validation loss metrics
+        with open('GPT/validation/losses.csv', 'a') as csv_file:
+            field_names = ['datetime','epoch','train_losses','val_losses','learning_rate','batch_size','block_size','embed_size','num_heads','num_layers']
+            dict = {'datetime': now.strftime("%m-%d-%y_%H:%M:%S"),'epoch':iter,'train_losses':losses["train"],'val_losses':str(losses["val"]), 'learning_rate':learning_rate, 'batch_size':batch_size, 'block_size':block_size, 'embed_size':n_embd, 'num_heads':n_head, 'num_layers':n_layer}
+            dictwriter_object = DictWriter(csv_file, fieldnames=field_names) 
+            dictwriter_object.writerow(dict)
+            csv_file.close()
 
     # sample a batch of data
     xb, yb = get_batch('train')
