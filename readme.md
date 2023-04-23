@@ -4,6 +4,8 @@ A repository storing my learnings and work on GPT models, AI architecture, and o
 
 ## Current Work
 
+![It's sentient...](https://cdn.discordapp.com/attachments/707638742080553061/1099771552435802225/image.png)
+
 [CodyAI](https://github.com/holdmydata/CodyAI) - Writing a GPT model from scratch. Using [Andrej Karpathy's YouTube tutorial](https://www.youtube.com/watch?v=kCc8FmEb1nY), will build off of this as I work toward a personal AI model. Notes added for my own learning.
 ## Next Steps
 1. Understanding the encoder architecture, learn how it works, and add to model.
