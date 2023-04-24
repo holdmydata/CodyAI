@@ -27,6 +27,7 @@ class Preprocessing:
         print(f'Data loaded with {len(data.index)}!')
         return data
 
+## Should I remove Author to create a single bot first, or work on a multi-agent system?
     def preprocess_data(self, data):
         data[['Author','Content','Attachments']] = data[['Author','Content','Attachments']].astype(str)
         data = data.drop(['AuthorID', 'Date', 'Attachments','Reactions'], axis=1) ## Figure a way to randomize reactions and attachments
