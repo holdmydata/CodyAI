@@ -9,6 +9,7 @@
 ## 2. Research and build backend memory for the model. ##
 ## 3. Panel/UI package for model training and evaluation. ##
 
+## 5/2/2023 - Added load_checkpoint function to model.py,
 
 import torch
 import torch.nn as nn
@@ -23,15 +24,16 @@ print(f'Cuda is available? : {torch.cuda.is_available()}!')
 #hyperparameters
 batch_size = 64
 block_size = 256
-max_iters = 10000
+max_iters = 1000
 eval_interval = 500
 learning_rate = 1e-3
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
-eval_iters = 200
+eval_iters = 100
 n_embd = 384
 n_head = 6
 n_layer = 6
 dropout = 0.2
+load_model = True
 now = datetime.now()
 date_time = now.strftime("%m_%d_%y_%H:%M:%S")
 print(f'Model Start: {now.strftime("%m/%d/%Y, %H:%M:%S")}')
@@ -40,9 +42,7 @@ print(f'Model Start: {now.strftime("%m/%d/%Y, %H:%M:%S")}')
 
 torch.manual_seed(1337)
 
-#wget https://raw.githubusercontent.com/karpathy/char-rnn/master/data/tinyshakespeare/input.txt
-## Karpathy's GPT tutorial uses Shakespeare's works as the training data. Could not, for the life of me, get wget to work in Jupyter but will fix when time permits. Originally used requests package. ##
-
+## Create Checkpoint ##
 def checkpoint(state, filename=f'GPT/checkpoints/checkpoint.pth.tar'):
     print(f'Saving checkpoint to {filename}...')
     torch.save(state, filename)
@@ -50,10 +50,18 @@ def checkpoint(state, filename=f'GPT/checkpoints/checkpoint.pth.tar'):
 with open('GPT/inputs/input_preprocessed.txt', 'r', encoding='utf-8') as f:
     text = f.read()
 
-# all unique characters in text
+## Load last checkpoint##
+def load_checkpoint(checkpoint, model):
+    print(f'Loading checkpoint...')
+    model.load_state_dict(checkpoint['state_dict'])
+    #model.optimizer.load_state_dict(checkpoint['optimizer']) - OPTIMIZER FOR CHECKPOINT?!
+    print(f'Checkpoint loaded.')
+    return model, load_model == False
+
+## Get all unique characters in text ##
 chars = sorted(list(set(text)))
 vocab_size = len(chars)
-# create a mapping from characters to integers
+## Create a mapping from characters to integers ##
 stoi = { ch:i for i,ch in enumerate(chars) }
 itos = { i:ch for i,ch in enumerate(chars) }
 encode = lambda s: [stoi[c] for c in s]
@@ -78,9 +86,13 @@ def get_batch(split):
 @torch.no_grad() #Tells Pytorch to not call backward/backprop on the loss
 def estimate_loss():
     # 4/22/2023 Adding Checkpoint block to save model state
-    checkpoint = {'state_dict': model.state_dict(), 'optimizer': optimizer.state_dict()}
-    if iter % 100 == 0:
+    checkpoint = {'state_dict': model.state_dict()}
+    if load_model:
+        load_checkpoint(torch.load(f'GPT/checkpoints/checkpoint.pth.tar'), model)
+    if iter % 50 == 0:
+        print('Saving checkpoint...')
         torch.save(checkpoint, f'GPT/checkpoints/checkpoint.pth.tar')
+        print('Checkpoint saved. Evaluating loss...')
     # 4/22/2023 End Checkpoint block
     out = {}
     model.eval()
@@ -151,6 +163,7 @@ class FeedForward(nn.Module):
     def forward(self, x):
         return self.net(x)
 
+# Block of self-attention + feed forward
 class Block(nn.Module):
     def __init__(self, n_embd, n_head):
         super().__init__()
@@ -165,8 +178,8 @@ class Block(nn.Module):
         x = x+ self.ffwd(self.ln2(x)) # (Batch,Time,Channel) Feed Forward module
         return x
 
-# model
-class BigramLanguageModel(nn.Module):
+# Model class used for training
+class ChatModel(nn.Module):
     
     def __init__(self):
         super().__init__()
@@ -175,10 +188,20 @@ class BigramLanguageModel(nn.Module):
         self.position_embedding_table = nn.Embedding(block_size, n_embd)
         self.blocks = nn.Sequential(*[Block(n_embd, n_head=n_head) for _ in range(n_layer)])
         self.ln_f = nn.LayerNorm(n_embd)
+        #self.optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate) - Optimizer load for checkpoint?? 5/2/2023
         #self.sa_heads = MultiHeadAttention(4, n_embd//4) # 4 heads of 8-dimensional self-attention
         #self.ffwd = FeedForward(n_embd)
         self.lm_head = nn.Linear(n_embd, vocab_size)
     
+    def _init_weights(self, module):
+        if isinstance(module, nn.Linear):
+            torch.nn.init.normal_(module.weight, mean=0.0, std=0.02)
+            if module.bias is not None:
+                torch.nn.init.zeros_(module.bias)
+        elif isinstance(module, nn.Embedding):
+            torch.nn.init.normal_(module.weight, mean=0.0, std=0.02)
+
+
     def forward(self, idx, targets=None):
         B, T = idx.shape
 
@@ -196,7 +219,6 @@ class BigramLanguageModel(nn.Module):
             B, T, C = logits.shape
             logits = logits.view(B*T, C)
             targets = targets.view(B*T) # or -1
-
             loss = F.cross_entropy(logits, targets)
 
         return logits, loss
@@ -222,10 +244,9 @@ class BigramLanguageModel(nn.Module):
 
 
 
-model = BigramLanguageModel()
-m = model.to(device)
+model = ChatModel()
 
-# create a Pytorch optimizer
+m = model.to(device)
 optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate)
 
 for iter in range(max_iters):
@@ -253,7 +274,14 @@ for iter in range(max_iters):
 
 # generate from the model
 context = torch.zeros((1,1), dtype=torch.long, device=device)
+
 with open (f'GPT/validation/export.txt', 'w', encoding='utf-8') as text_file:
-    export = decode(m.generate(context, max_new_tokens=5000)[0].tolist())
+    #if load_model:
+    #    load_checkpoint(torch.load('GPT/checkpoints/checkpoint.pth.tar'))
+
+    export = decode(m.generate(context, max_new_tokens=200)[0].tolist())
     text_file.writelines(export)
     print(f'Exported to {text_file.name}')
+
+# save the model
+torch.save(model.state_dict(), 'GPT/validation/model.pt')

@@ -8,3 +8,4 @@ checkpoints/
 GPT/inputs/input_preprocessed.txt
 GPT/inputs/input.csv
 GPT/validation/export.txt
+GPT/validation/model.pt
