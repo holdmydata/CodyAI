@@ -42,13 +42,14 @@ print(f'Model Start: {now.strftime("%m/%d/%Y, %H:%M:%S")}')
 
 torch.manual_seed(1337)
 
+with open('GPT/inputs/input_preprocessed.txt', 'r', encoding='utf-8') as f:
+    text = f.read()
+
 ## Create Checkpoint ##
 def checkpoint(state, filename=f'GPT/checkpoints/checkpoint.pth.tar'):
     print(f'Saving checkpoint to {filename}...')
     torch.save(state, filename)
     print(f'Checkpoint saved.')
-with open('GPT/inputs/input_preprocessed.txt', 'r', encoding='utf-8') as f:
-    text = f.read()
 
 ## Load last checkpoint##
 def load_checkpoint(checkpoint, model):
@@ -68,6 +69,7 @@ encode = lambda s: [stoi[c] for c in s]
 decode = lambda l: ''.join([itos[i] for i in l])
 
 # Train/test split
+print('Encoding Text')
 data = torch.tensor(encode(text), dtype=torch.long, device=device)
 n = int(0.9*len(data))
 train_data = data[:n]
@@ -85,6 +87,7 @@ def get_batch(split):
 
 @torch.no_grad() #Tells Pytorch to not call backward/backprop on the loss
 def estimate_loss():
+    print('Estimating loss...')
     # 4/22/2023 Adding Checkpoint block to save model state
     checkpoint = {'state_dict': model.state_dict()}
     if load_model:
@@ -95,6 +98,7 @@ def estimate_loss():
         print('Checkpoint saved. Evaluating loss...')
     # 4/22/2023 End Checkpoint block
     out = {}
+    print('Evalutating Model...')
     model.eval()
     for split in ['train', 'val']:
         losses = torch.zeros(eval_iters)
@@ -103,6 +107,7 @@ def estimate_loss():
             logits, loss = model(X, Y)
             losses[k] = loss.item()
         out[split] = losses.mean()
+    print('Training Model')
     model.train()
     return out
 
@@ -243,14 +248,15 @@ class ChatModel(nn.Module):
         return idx
 
 
-
+print('Model @246')
 model = ChatModel()
-
+print('Model @249')
 m = model.to(device)
 optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate)
 
 for iter in range(max_iters):
     # occasionally evaluate the loss on train and val sets
+    print(f'iter: {iter}, datetime: {now.strftime("%m-%d-%y_%H:%M:%S")}')
     if iter % eval_interval == 0:
         losses = estimate_loss()
         now = datetime.now()
@@ -275,10 +281,9 @@ for iter in range(max_iters):
 # generate from the model
 context = torch.zeros((1,1), dtype=torch.long, device=device)
 
-with open (f'GPT/validation/export.txt', 'w', encoding='utf-8') as text_file:
-    #if load_model:
-    #    load_checkpoint(torch.load('GPT/checkpoints/checkpoint.pth.tar'))
 
+with open (f'GPT/validation/export.txt', 'w', encoding='utf-8') as text_file:
+ 
     export = decode(m.generate(context, max_new_tokens=200)[0].tolist())
     text_file.writelines(export)
     print(f'Exported to {text_file.name}')
