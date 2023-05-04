@@ -13,7 +13,7 @@
 
 import torch
 import torch.nn as nn
-from datetime import datetime
+from datetime import datetime, date
 from torch.nn import functional as F
 import pandas as pd
 import csv
@@ -25,7 +25,7 @@ print(f'Cuda is available? : {torch.cuda.is_available()}!')
 batch_size = 64
 block_size = 256
 max_iters = 1000
-eval_interval = 500
+eval_interval = 100
 learning_rate = 1e-3
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 eval_iters = 100
@@ -57,7 +57,10 @@ def load_checkpoint(checkpoint, model):
     model.load_state_dict(checkpoint['state_dict'])
     #model.optimizer.load_state_dict(checkpoint['optimizer']) - OPTIMIZER FOR CHECKPOINT?!
     print(f'Checkpoint loaded.')
-    return model, load_model == False
+    return model
+
+def get_filename_datetime():
+    return f'export_{str(date.today())}.txt'
 
 ## Get all unique characters in text ##
 chars = sorted(list(set(text)))
@@ -89,13 +92,9 @@ def get_batch(split):
 def estimate_loss():
     print('Estimating loss...')
     # 4/22/2023 Adding Checkpoint block to save model state
-    checkpoint = {'state_dict': model.state_dict()}
-    if load_model:
-        load_checkpoint(torch.load(f'GPT/checkpoints/checkpoint.pth.tar'), model)
-    if iter % 50 == 0:
-        print('Saving checkpoint...')
-        torch.save(checkpoint, f'GPT/checkpoints/checkpoint.pth.tar')
-        print('Checkpoint saved. Evaluating loss...')
+
+    # if load_model:
+    #     load_checkpoint(torch.load(f'GPT/checkpoints/checkpoint.pth.tar'), model)
     # 4/22/2023 End Checkpoint block
     out = {}
     print('Evalutating Model...')
@@ -253,17 +252,25 @@ model = ChatModel()
 print('Model @249')
 m = model.to(device)
 optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate)
-
+if load_model:
+    checkpoint = {'state_dict': model.state_dict()}
+    load_checkpoint(torch.load(f'GPT/checkpoints/checkpoint.pth.tar'), model)
 for iter in range(max_iters):
     # occasionally evaluate the loss on train and val sets
     print(f'iter: {iter}, datetime: {now.strftime("%m-%d-%y_%H:%M:%S")}')
     if iter % eval_interval == 0:
+#### MOVED SAVE CHECKPOINT TO HERE 5/3/2023 ####
+        print('Saving checkpoint...')
+        torch.save(checkpoint, f'GPT/checkpoints/checkpoint.pth.tar')
+        print('Checkpoint saved. Evaluating loss...')
+#### MOVED SAVE CHECKPOINT TO HERE 5/3/2023 ####
         losses = estimate_loss()
         now = datetime.now()
         print(f'time: {now.strftime("%m/%d/%y %H:%M:%S")};iter {iter}; train loss: {losses["train"]:.3f}; val loss: {losses["val"]:.3f}')
         # save validation loss metrics
         with open('GPT/validation/losses.csv', 'a') as csv_file:
             field_names = ['datetime','epoch','train_losses','val_losses','learning_rate','batch_size','block_size','embed_size','num_heads','num_layers']
+            now = datetime.now()
             dict = {'datetime': now.strftime("%m-%d-%y_%H:%M:%S"),'epoch':iter,'train_losses':losses["train"],'val_losses':str(losses["val"]), 'learning_rate':learning_rate, 'batch_size':batch_size, 'block_size':block_size, 'embed_size':n_embd, 'num_heads':n_head, 'num_layers':n_layer}
             dictwriter_object = DictWriter(csv_file, fieldnames=field_names) 
             dictwriter_object.writerow(dict)
@@ -281,12 +288,14 @@ for iter in range(max_iters):
 # generate from the model
 context = torch.zeros((1,1), dtype=torch.long, device=device)
 
-
-with open (f'GPT/validation/export.txt', 'w', encoding='utf-8') as text_file:
- 
+name = get_filename_datetime()
+with open (f'GPT/validation/{name}', 'w', encoding='utf-8') as text_file:
+    print('Generating text...')
     export = decode(m.generate(context, max_new_tokens=200)[0].tolist())
+    print('Exporting text...')
     text_file.writelines(export)
-    print(f'Exported to {text_file.name}')
+    print('Text exported to {text_file.name}')
 
 # save the model
-torch.save(model.state_dict(), 'GPT/validation/model.pt')
+print('Saving model...')
+torch.save(model.state_dict(), f'GPT/validation/model-{now.strftime("%m-%d-%y_%H:%M:%S")}.pt')
