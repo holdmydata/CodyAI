@@ -25,7 +25,7 @@ print(f'Cuda is available? : {torch.cuda.is_available()}!')
 #### 5/4/23 - CREATE INIT FILE HERE FOR PARAMETER PASSING ####
 batch_size = 64
 block_size = 256
-max_iters = 1000
+max_iters = 5000
 eval_interval = 100
 learning_rate = 1e-3
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
@@ -34,7 +34,7 @@ n_embd = 384
 n_head = 6
 n_layer = 6
 dropout = 0.2
-load_model = False
+load_model = True
 now = datetime.now()
 date_time = now.strftime("%m_%d_%y_%H:%M:%S")
 print(f'Model Start: {now.strftime("%m/%d/%Y, %H:%M:%S")}')
@@ -43,7 +43,7 @@ corpus_only = True
 evaluation_mode = True
 
 #-----------------#
-### Randomize Seed Eventually###
+### Seed selection is used in LLM models. Update this to save seeds based on context. ###
 torch.manual_seed(1337)
 
 ## GATHER TEXT DATA ##
@@ -55,6 +55,8 @@ if evaluation_mode:
 else:
     if corpus_only:
         data_path = 'GPT/inputs/corpus_only.txt'
+        with open(data_path, 'r', encoding='utf-8') as f:
+            text = f.read()
     else:
         data_path = 'GPT/inputs/input_preprocessed.txt'
         with open(data_path, 'r', encoding='utf-8') as f:
@@ -97,9 +99,12 @@ print('Encoding Text')
 data = torch.tensor(encode(text), dtype=torch.long, device=device)
 
 # Train/test split for training. Eval is only 
-n = int(0.9*len(data))
-train_data = data[:n]
-val_data = data[n:]
+if evaluation_mode:
+    pass
+else:
+    n = int(0.9*len(data))
+    train_data = data[:n]
+    val_data = data[n:]
 
 # Data loading
 def get_batch(split):
@@ -274,40 +279,47 @@ class ChatModel(nn.Module):
 model = ChatModel()
 m = model.to(device)
 if evaluation_mode:
-    m.eval()
-optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate)
-if load_model:
     checkpoint = {'state_dict': model.state_dict()}
     load_checkpoint(torch.load(f'GPT/checkpoints/checkpoint.pth.tar'), model)
-
-#### INSERT EVAL PROMPTING HERE 5/3/2023 ####
-if evaluation_mode:
+    m.eval()
     context = torch.zeros((1,1), dtype=torch.long, device=device)
     export = decode(m.generate(context, max_new_tokens=200)[0].tolist())
-    print(export)
+    print(f'CodyAI: {export}')
+else:
+    if load_model:
+        checkpoint = {'state_dict': model.state_dict()}
+        load_checkpoint(torch.load(f'GPT/checkpoints/checkpoint.pth.tar'), model)
 
-#### INSERT EVAL PROMPTING HERE 5/3/2023 ####
+optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate)
 
-for iter in range(max_iters):
-    # occasionally evaluate the loss on train and val sets
-    print(f'iter: {iter}, datetime: {now.strftime("%m-%d-%y_%H:%M:%S")}')
-    if iter % eval_interval == 0:
-#### MOVED SAVE CHECKPOINT TO HERE 5/3/2023 ####
-        print('Saving checkpoint...')
-        torch.save(checkpoint, f'GPT/checkpoints/checkpoint.pth.tar')
-        print('Checkpoint saved. Evaluating loss...')
-#### MOVED SAVE CHECKPOINT TO HERE 5/3/2023 ####
-        losses = estimate_loss()
-        now = datetime.now()
-        print(f'time: {now.strftime("%m/%d/%y %H:%M:%S")};iter {iter}; train loss: {losses["train"]:.3f}; val loss: {losses["val"]:.3f}')
-        # save validation loss metrics
-        with open('GPT/validation/losses.csv', 'a') as csv_file:
-            field_names = ['datetime','epoch','train_losses','val_losses','learning_rate','batch_size','block_size','embed_size','num_heads','num_layers']
+if evaluation_mode:
+    pass
+    # context = torch.zeros((1,1), dtype=torch.long, device=device)
+    # export = decode(m.generate(context, max_new_tokens=200)[0].tolist())
+    # print(f'CodyAI: {export}')
+
+######## MODEL EVALUATION LOOP ########
+else:
+    for iter in range(max_iters):
+        # occasionally evaluate the loss on train and val sets
+        print(f'iter: {iter}, datetime: {now.strftime("%m-%d-%y_%H:%M:%S")}')
+        if iter % eval_interval == 0:
+    #### MOVED SAVE CHECKPOINT TO HERE 5/3/2023 ####
+            print('Saving checkpoint...')
+            torch.save(checkpoint, f'GPT/checkpoints/checkpoint.pth.tar')
+            print('Checkpoint saved...')
+    #### MOVED SAVE CHECKPOINT TO HERE 5/3/2023 ####
+            losses = estimate_loss()
             now = datetime.now()
-            dict = {'datetime': now.strftime("%m-%d-%y_%H:%M:%S"),'epoch':iter,'train_losses':losses["train"],'val_losses':str(losses["val"]), 'learning_rate':learning_rate, 'batch_size':batch_size, 'block_size':block_size, 'embed_size':n_embd, 'num_heads':n_head, 'num_layers':n_layer}
-            dictwriter_object = DictWriter(csv_file, fieldnames=field_names) 
-            dictwriter_object.writerow(dict)
-            csv_file.close()
+            print(f'time: {now.strftime("%m/%d/%y %H:%M:%S")};iter {iter}; train loss: {losses["train"]:.3f}; val loss: {losses["val"]:.3f}')
+            # save validation loss metrics
+            with open('GPT/validation/losses.csv', 'a') as csv_file:
+                field_names = ['datetime','epoch','train_losses','val_losses','learning_rate','batch_size','block_size','embed_size','num_heads','num_layers']
+                now = datetime.now()
+                dict = {'datetime': now.strftime("%m-%d-%y_%H:%M:%S"),'epoch':iter,'train_losses':losses["train"],'val_losses':str(losses["val"]), 'learning_rate':learning_rate, 'batch_size':batch_size, 'block_size':block_size, 'embed_size':n_embd, 'num_heads':n_head, 'num_layers':n_layer}
+                dictwriter_object = DictWriter(csv_file, fieldnames=field_names) 
+                dictwriter_object.writerow(dict)
+                csv_file.close()
 
     # sample a batch of data
     xb, yb = get_batch('train')
@@ -333,10 +345,11 @@ else:
         print('Text exported to {text_file.name}')
 
 # save the model
-print('Saving model...')
+
 if evaluation_mode:
     pass
 else:
+    print('Saving model...')
     if corpus_only:
         torch.save(model.state_dict(), f'GPT/validation/model-corpus-only.pt')
     else:
