@@ -22,6 +22,7 @@ from csv import DictWriter
 print(f'Cuda is available? : {torch.cuda.is_available()}!')
 
 #hyperparameters
+#### 5/4/23 - CREATE INIT FILE HERE FOR PARAMETER PASSING ####
 batch_size = 64
 block_size = 256
 max_iters = 1000
@@ -33,25 +34,39 @@ n_embd = 384
 n_head = 6
 n_layer = 6
 dropout = 0.2
-load_model = True
+load_model = False
 now = datetime.now()
 date_time = now.strftime("%m_%d_%y_%H:%M:%S")
 print(f'Model Start: {now.strftime("%m/%d/%Y, %H:%M:%S")}')
 
-#-----------------#
+corpus_only = True
+evaluation_mode = True
 
+#-----------------#
+### Randomize Seed Eventually###
 torch.manual_seed(1337)
 
-with open('GPT/inputs/input_preprocessed.txt', 'r', encoding='utf-8') as f:
-    text = f.read()
+## GATHER TEXT DATA ##
 
-## Create Checkpoint ##
+if evaluation_mode:
+    text = input('Enter text to evaluate: ')
+    text = text.lower()
+
+else:
+    if corpus_only:
+        data_path = 'GPT/inputs/corpus_only.txt'
+    else:
+        data_path = 'GPT/inputs/input_preprocessed.txt'
+        with open(data_path, 'r', encoding='utf-8') as f:
+            text = f.read()
+
+## Create Checkpoint Function##
 def checkpoint(state, filename=f'GPT/checkpoints/checkpoint.pth.tar'):
     print(f'Saving checkpoint to {filename}...')
     torch.save(state, filename)
     print(f'Checkpoint saved.')
 
-## Load last checkpoint##
+## Load Last Checkpoint Function##
 def load_checkpoint(checkpoint, model):
     print(f'Loading checkpoint...')
     model.load_state_dict(checkpoint['state_dict'])
@@ -62,6 +77,8 @@ def load_checkpoint(checkpoint, model):
 def get_filename_datetime():
     return f'export_{str(date.today())}.txt'
 
+
+
 ## Get all unique characters in text ##
 chars = sorted(list(set(text)))
 vocab_size = len(chars)
@@ -71,9 +88,15 @@ itos = { i:ch for i,ch in enumerate(chars) }
 encode = lambda s: [stoi[c] for c in s]
 decode = lambda l: ''.join([itos[i] for i in l])
 
-# Train/test split
+
+## Encode Text ##
+## Use for both training and evaluation ##
+
+
 print('Encoding Text')
 data = torch.tensor(encode(text), dtype=torch.long, device=device)
+
+# Train/test split for training. Eval is only 
 n = int(0.9*len(data))
 train_data = data[:n]
 val_data = data[n:]
@@ -81,6 +104,7 @@ val_data = data[n:]
 # Data loading
 def get_batch(split):
     # generate small batch of data inputs x/targets y
+    #### ENCODING EVAL BREAKS HERE 5/4/2023 ####
     data = train_data if split =='train' else val_data
     ix = torch.randint(len(data) - block_size, (batch_size,))
     x = torch.stack([data[i:i+block_size] for i in ix])
@@ -247,14 +271,23 @@ class ChatModel(nn.Module):
         return idx
 
 
-print('Model @246')
 model = ChatModel()
-print('Model @249')
 m = model.to(device)
+if evaluation_mode:
+    m.eval()
 optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate)
 if load_model:
     checkpoint = {'state_dict': model.state_dict()}
     load_checkpoint(torch.load(f'GPT/checkpoints/checkpoint.pth.tar'), model)
+
+#### INSERT EVAL PROMPTING HERE 5/3/2023 ####
+if evaluation_mode:
+    context = torch.zeros((1,1), dtype=torch.long, device=device)
+    export = decode(m.generate(context, max_new_tokens=200)[0].tolist())
+    print(export)
+
+#### INSERT EVAL PROMPTING HERE 5/3/2023 ####
+
 for iter in range(max_iters):
     # occasionally evaluate the loss on train and val sets
     print(f'iter: {iter}, datetime: {now.strftime("%m-%d-%y_%H:%M:%S")}')
@@ -286,16 +319,25 @@ for iter in range(max_iters):
     optimizer.step()
 
 # generate from the model
-context = torch.zeros((1,1), dtype=torch.long, device=device)
 
-name = get_filename_datetime()
-with open (f'GPT/validation/{name}', 'w', encoding='utf-8') as text_file:
-    print('Generating text...')
-    export = decode(m.generate(context, max_new_tokens=200)[0].tolist())
-    print('Exporting text...')
-    text_file.writelines(export)
-    print('Text exported to {text_file.name}')
+if evaluation_mode:
+    pass
+else:
+    context = torch.zeros((1,1), dtype=torch.long, device=device)
+    name = get_filename_datetime()
+    with open (f'GPT/validation/{name}', 'w', encoding='utf-8') as text_file:
+        print('Generating text...')
+        export = decode(m.generate(context, max_new_tokens=200)[0].tolist())
+        print('Exporting text...')
+        text_file.writelines(export)
+        print('Text exported to {text_file.name}')
 
 # save the model
 print('Saving model...')
-torch.save(model.state_dict(), f'GPT/validation/model-{now.strftime("%m-%d-%y_%H:%M:%S")}.pt')
+if evaluation_mode:
+    pass
+else:
+    if corpus_only:
+        torch.save(model.state_dict(), f'GPT/validation/model-corpus-only.pt')
+    else:
+        torch.save(model.state_dict(), f'GPT/validation/model.pt')

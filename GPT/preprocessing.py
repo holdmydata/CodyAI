@@ -16,6 +16,7 @@ import re
 import nltk
 nltk.download('punkt')
 
+corpus_only = True
 data_path = 'GPT\inputs\input.csv'
 
 class Preprocessing:
@@ -31,6 +32,17 @@ class Preprocessing:
     def preprocess_data(self, data):
         data[['Author','Content','Attachments']] = data[['Author','Content','Attachments']].astype(str)
         data = data.drop(['AuthorID', 'Date', 'Attachments','Reactions'], axis=1) ## Figure a way to randomize reactions and attachments
+        data['Content'] = data['Content'].apply(lambda x: x.replace('\n', ''))
+        data = data[~data.Content.str.contains("nan")]
+        data['Content'] = data['Content'].apply(lambda x: x if isinstance(x,str) else '')
+        print(f'Data preprocessed with {len(data.index)}!')
+        print(data.head(5))
+        return data
+
+## To remove all authors, use this function instead of preprocess_data
+    def corpus_only_data(self, data):
+        data = data.drop(['AuthorID', 'Author', 'Date', 'Attachments','Reactions','Attachments'], axis=1) ## Figure a way to randomize reactions and attachments
+        data[['Content']] = data[['Content']].astype(str)
         data['Content'] = data['Content'].apply(lambda x: x.replace('\n', ''))
         data = data[~data.Content.str.contains("nan")]
         data['Content'] = data['Content'].apply(lambda x: x if isinstance(x,str) else '')
@@ -75,12 +87,18 @@ class Preprocessing:
         return data.lower()
     
     def save_data(self, data):
-        data.to_csv('GPT\inputs\input_preprocessed.txt', index=None, header=None, sep='\t')
+        if corpus_only:
+            data.to_csv('GPT\inputs\corpus_only.txt', index=None, header=None, sep='\t')
+        else:
+            data.to_csv('GPT\inputs\input_preprocessed.txt', index=None, header=None, sep='\t')
 
 if __name__ == '__main__':
     preprocessing = Preprocessing(data_path)
     data = preprocessing.load_data()
-    data = preprocessing.preprocess_data(data)
+    if corpus_only:
+        data = preprocessing.corpus_only_data(data)
+    else:
+        data = preprocessing.preprocess_data(data)
     data['Content'] = data['Content'].apply(preprocessing.remove_urls)
     data['Content'] = data['Content'].apply(preprocessing.remove_emojis)
     data['Content'] = data['Content'].apply(preprocessing.remove_special_characters)
