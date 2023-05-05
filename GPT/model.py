@@ -40,7 +40,7 @@ date_time = now.strftime("%m_%d_%y_%H:%M:%S")
 print(f'Model Start: {now.strftime("%m/%d/%Y, %H:%M:%S")}')
 
 corpus_only = True
-evaluation_mode = True
+evaluation_mode = False
 
 #-----------------#
 ### Seed selection is used in LLM models. Update this to save seeds based on context. ###
@@ -321,14 +321,13 @@ else:
                 dictwriter_object.writerow(dict)
                 csv_file.close()
 
-    # sample a batch of data
-    xb, yb = get_batch('train')
-
-    # evaluate the loss
-    logits, loss = model(xb, yb)
-    optimizer.zero_grad(set_to_none=True)
-    loss.backward()
-    optimizer.step()
+        # sample a batch of data
+        xb, yb = get_batch('train')
+        # forward pass
+        logits, loss = model(xb, yb)
+        optimizer.zero_grad(set_to_none=True)
+        loss.backward()
+        optimizer.step()
 
 # generate from the model
 
