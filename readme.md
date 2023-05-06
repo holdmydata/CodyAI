@@ -16,8 +16,9 @@ A repository storing my learnings and work on GPT models, AI architecture, and o
     - Model: Checkpoints! I'm saving checkpoints now. I'm also saving the model, but I'm not sure if it's working. I'll have to test it out.
     - Model: Added Eval option in parameters to allow quick test of input. 
     - Model ToDo: A TON. 
- [5/5 First Combined Model Run. Forgot to change the training to a new model...so it failed...](https://github.com/holdmydata/CodyAI/blob/master/GPT/assets/First_corpus_run_combined_sentences.PNG)
- 
+    
+ ![5/5 First Combined Model Run. Forgot to change the training to a new model...so it failed...](https://github.com/holdmydata/CodyAI/blob/master/GPT/assets/First_corpus_run_combined_sentences.PNG)
+
 ## Next Steps
 1. Understanding the encoder architecture, learn how it works, and add to model.
 2. Research and build backend memory for the model. Vectorize dimensional databases. 
