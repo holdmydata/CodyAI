@@ -25,11 +25,11 @@ print(f'Cuda is available? : {torch.cuda.is_available()}!')
 #### 5/4/23 - CREATE INIT FILE HERE FOR PARAMETER PASSING ####
 batch_size = 64
 block_size = 256
-max_iters = 5000
+max_iters = 1000
 eval_interval = 100
 learning_rate = 1e-3
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
-eval_iters = 100
+eval_iters = 200
 n_embd = 384
 n_head = 6
 n_layer = 6
@@ -40,7 +40,7 @@ date_time = now.strftime("%m_%d_%y_%H:%M:%S")
 print(f'Model Start: {now.strftime("%m/%d/%Y, %H:%M:%S")}')
 
 corpus_only = True
-evaluation_mode = False
+evaluation_mode = True
 
 #-----------------#
 ### Seed selection is used in LLM models. Update this to save seeds based on context. ###
@@ -54,7 +54,7 @@ if evaluation_mode:
 
 else:
     if corpus_only:
-        data_path = 'GPT/inputs/corpus_only.txt'
+        data_path = 'GPT/inputs/corpus_combined.txt'
         with open(data_path, 'r', encoding='utf-8') as f:
             text = f.read()
     else:

@@ -13,11 +13,15 @@
 
 import pandas as pd
 import re
-import nltk
-nltk.download('punkt')
+##import nltk
+##nltk.download('punkt')
 
 corpus_only = True
 data_path = 'GPT\inputs\input.csv'
+
+def save_to_txt(data, filename):
+    with open(filename, 'w', encoding='utf-8') as file:
+        file.write(data)
 
 class Preprocessing:
     def __init__(self, data_path):
@@ -91,20 +95,30 @@ class Preprocessing:
             data.to_csv('GPT\inputs\corpus_only.txt', index=None, header=None, sep='\t')
         else:
             data.to_csv('GPT\inputs\input_preprocessed.txt', index=None, header=None, sep='\t')
+    
+    ## For saving to txt file. Maybe use this instead for saving and have option to pick which one##
+    def save_to_txt(data, filename):
+        with open(filename, 'w', encoding='utf-8') as file:
+            file.write(data)
 
 if __name__ == '__main__':
     preprocessing = Preprocessing(data_path)
     data = preprocessing.load_data()
-    if corpus_only:
-        data = preprocessing.corpus_only_data(data)
-    else:
-        data = preprocessing.preprocess_data(data)
+    # if corpus_only:
+    #     data = preprocessing.corpus_only_data(data)
+    # else:
+    #     data = preprocessing.preprocess_data(data)
     data['Content'] = data['Content'].apply(preprocessing.remove_urls)
     data['Content'] = data['Content'].apply(preprocessing.remove_emojis)
     data['Content'] = data['Content'].apply(preprocessing.remove_special_characters)
     data = data[data['Content'].str.strip() != '']
     data = preprocessing.drop_blank_rows(data)
+   ## When keeping authors, use data['ProcessedText'] = data['Author'] + ': ' + data['Content'] ##
+    data['ProcessedText'] = data['Content']
+    text_data = ' '.join(data['ProcessedText'].tolist()).replace('\n', ' ')
     preprocessing.save_data(data)
+    #Add way to save both sets of data to save_data
+    save_to_txt(text_data, 'GPT\inputs\corpus_combined.txt')
 
 
 ### REMOVED TOKENIZATION CODE ###
